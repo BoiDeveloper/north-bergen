@@ -51,9 +51,6 @@
         .skill-node { border: 1px solid var(--border-color); cursor: pointer; }
         .skill-node.unlocked { border-color: var(--gold-accent); background-color: rgba(212, 175, 55, 0.1); }
         .skill-node.can-unlock:hover { background-color: rgba(212, 175, 55, 0.2); }
-        .news-ticker { background-color: #111; padding: 4px; font-family: 'VT323', monospace; white-space: nowrap; overflow: hidden; }
-        .news-item { display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }
-        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
         .fade-out { animation: fadeOut 0.5s forwards; }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
         .heist-step.completed { text-decoration: line-through; color: var(--text-muted); }
@@ -92,6 +89,10 @@
                     </header>
                     <div id="stats-panel" class="space-y-3 flex-grow"></div>
                     <div id="gear-panel" class="flex justify-center gap-4 my-4"></div>
+                    <div class="mt-auto pt-4 text-center">
+                        <p class="text-xs text-gray-500">Family ID:</p>
+                        <p id="player-id" class="text-xs text-gray-400 break-all">loading...</p>
+                    </div>
                 </div>
             </aside>
 
@@ -129,9 +130,6 @@
             </aside>
         </div>
         
-        <div class="news-ticker rounded-lg">
-            <div id="news-feed" class="news-item"></div>
-        </div>
     </div>
     
     <div id="modal-container" class="pointer-events-none"></div>
@@ -230,6 +228,7 @@
         };
         
         let UIElements = {};
+        let isTyping = false;
 
         // --- INITIALIZATION ---
         function initializeGameState() {
@@ -420,6 +419,7 @@
         }
         function renderBusinesses() {
             const container = document.getElementById('businesses-tab');
+            if (isTyping) return; // Don't re-render if user is typing
             container.innerHTML = `
                 <div class="text-center mb-4">
                     <h2 class="text-2xl text-gold">Front Businesses</h2>
@@ -518,6 +518,13 @@
                 if (button.id === 'max-launder-btn') {
                     document.getElementById('launder-amount').value = Math.floor(gameState.dirtyCash);
                 }
+            });
+
+            UIElements.mainContentPanel.addEventListener('focusin', e => {
+                if (e.target.id === 'launder-amount') isTyping = true;
+            });
+            UIElements.mainContentPanel.addEventListener('focusout', e => {
+                if (e.target.id === 'launder-amount') isTyping = false;
             });
 
             UIElements.tabsContainer.addEventListener('click', e => {
