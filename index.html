@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>North Bergen v0.8</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Lora:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <style>
+        :root {
+            --gold-accent: #D4AF37; --dark-red: #8B0000; --dark-bg: #121212;
+            --panel-bg: #1E1E1E; --border-color: rgba(212, 175, 55, 0.2);
+            --text-color: #EAEAEA; --text-muted: #999;
+            --gang-vultures: #b91c1c; --gang-spiders: #a855f7; --gang-serpents: #16a34a;
+            --rival-crimson: #dc2626; --rival-3rdfloor: #d97706; --rival-iron: #64748b;
+            --dirty-cash: #c026d3; --clean-cash: #16a34a;
+        }
+        body {
+            font-family: 'Lora', serif; background-color: var(--dark-bg); color: var(--text-color);
+            background-image: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+            overflow: hidden;
+        }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Cinzel', serif; }
+        .font-terminal { font-family: 'VT323', monospace; }
+        .text-gold { color: var(--gold-accent); text-shadow: 0 0 5px rgba(212, 175, 55, 0.5); }
+        .panel { background-color: var(--panel-bg); border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .btn-action { transition: all 0.3s ease; font-family: 'Lora', serif; font-weight: bold; border: 1px solid var(--border-color); background-color: rgba(30, 30, 30, 0.8); color: var(--text-color); }
+        .btn-action:hover:not(:disabled) { background-color: var(--gold-accent); color: var(--dark-bg); transform: translateY(-2px); border-color: var(--gold-accent); box-shadow: 0 0 10px var(--gold-accent); }
+        .btn-action:disabled { cursor: not-allowed; background-color: #2a2a2a; color: #666; border-color: rgba(255,255,255,0.1); }
+        .modal-backdrop { background-color: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
+        .modal-content { background-color: var(--panel-bg); border: 1px solid var(--gold-accent); box-shadow: 0 0 20px var(--gold-accent); }
+        .stat-bar-bg { background-color: #333; border: 1px solid #444; }
+        .stat-bar-fill { transition: width 0.5s ease-in-out; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .stat-bar-fill-health { background-color: var(--dark-red); } .stat-bar-fill-energy { background-color: #2E86C1; }
+        .stat-bar-fill-xp { background: linear-gradient(90deg, #6a0dad, #a020f0); } .stat-bar-fill-rep { background: linear-gradient(90deg, var(--gold-accent), #ffdf70); }
+        .tab-button { background-color: #2a2a2a; border-bottom: 2px solid transparent; transition: all 0.3s ease; }
+        .tab-button.active { color: var(--gold-accent); border-bottom-color: var(--gold-accent); }
+        .tab-content { display: none; transition: opacity 0.3s ease-in-out; }
+        .tab-content.active { display: block; }
+        .scrollable-panel { overflow-y: auto; }
+        .scrollable-panel::-webkit-scrollbar { width: 8px; }
+        .scrollable-panel::-webkit-scrollbar-track { background: var(--dark-bg); }
+        .scrollable-panel::-webkit-scrollbar-thumb { background-color: var(--gold-accent); border-radius: 4px; border: 2px solid var(--dark-bg); }
+        .skill-node { border: 1px solid var(--border-color); cursor: pointer; }
+        .skill-node.unlocked { border-color: var(--gold-accent); background-color: rgba(212, 175, 55, 0.1); }
+        .skill-node.can-unlock:hover { background-color: rgba(212, 175, 55, 0.2); }
+        .news-ticker { background-color: #111; padding: 4px; font-family: 'VT323', monospace; white-space: nowrap; overflow: hidden; }
+        .news-item { display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+        .fade-out { animation: fadeOut 0.5s forwards; }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+        .heist-step.completed { text-decoration: line-through; color: var(--text-muted); }
+        .heist-step.active { color: var(--gold-accent); }
+        #main-menu { background: linear-gradient(to bottom, #000000, #1c1c1c); }
+        .particle { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); animation: float 20s infinite linear; }
+        @keyframes float { 0% { transform: translateY(100vh) scale(0); } 100% { transform: translateY(-10vh) scale(1); opacity: 0; } }
+    </style>
+</head>
+<body class="bg-black text-white">
+
+    <div id="main-menu" class="fixed inset-0 flex flex-col items-center justify-center z-50 transition-opacity duration-500 overflow-hidden">
+        <div id="particle-container" class="absolute inset-0"></div>
+        <div class="text-center z-10">
+            <h1 class="text-6xl font-bold text-gold font-['Cinzel']">North Bergen</h1>
+            <p class="text-gray-400 mt-2 italic">The city always wins.</p>
+            <div class="mt-8 space-y-4 flex flex-col items-center">
+                <button id="play-button" class="btn-action px-8 py-4 text-2xl w-64">Enter the Streets</button>
+                <button id="new-game-button" class="btn-action px-8 py-2 text-lg w-64">New Game</button>
+                <button id="legacy-button" class="btn-action px-8 py-2 text-lg w-64">Legacy</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container" class="h-screen flex-col p-2 sm:p-4 gap-4" style="display: none;">
+
+        <header class="panel rounded-lg p-2 text-center">
+            <h2 id="game-time-display" class="text-2xl text-gold font-terminal"></h2>
+        </header>
+        
+        <div class="flex-grow flex flex-col lg:flex-row gap-4 min-h-0">
+            <aside class="w-full lg:w-1/4 flex flex-col gap-4">
+                <div class="panel p-4 rounded-lg flex-grow flex flex-col scrollable-panel">
+                    <header class="text-center mb-4 border-b-2 border-b-[var(--border-color)] pb-4 sticky top-0 bg-panel-bg z-10">
+                        <h1 id="player-alias" class="text-3xl font-bold text-gold">North Bergen</h1>
+                    </header>
+                    <div id="stats-panel" class="space-y-3 flex-grow"></div>
+                    <div id="gear-panel" class="flex justify-center gap-4 my-4"></div>
+                </div>
+            </aside>
+
+            <main class="w-full lg:w-1/2 flex flex-col gap-4">
+                <div id="tabs-container" class="panel rounded-lg p-1 flex flex-wrap justify-around">
+                    <button class="tab-button active flex-1 p-2" data-tab="crimes">Crimes</button>
+                    <button class="tab-button flex-1 p-2" data-tab="heists">Heists</button>
+                    <button class="tab-button flex-1 p-2" data-tab="skills">Skills</button>
+                    <button class="tab-button flex-1 p-2" data-tab="businesses">Businesses</button>
+                    <button class="tab-button flex-1 p-2" data-tab="turf">Turf</button>
+                    <button class="tab-button flex-1 p-2" data-tab="gang">Gang</button>
+                    <button class="tab-button flex-1 p-2" data-tab="market">Market</button>
+                    <button class="tab-button flex-1 p-2" data-tab="inventory">Inventory</button>
+                    <button class="tab-button flex-1 p-2" data-tab="news">News</button>
+                </div>
+
+                <div id="main-content-panel" class="panel p-4 rounded-lg flex-grow relative scrollable-panel">
+                    <div id="crimes-tab" class="tab-content active grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                    <div id="heists-tab" class="tab-content"></div>
+                    <div id="skills-tab" class="tab-content"></div>
+                    <div id="businesses-tab" class="tab-content"></div>
+                    <div id="turf-tab" class="tab-content"></div>
+                    <div id="gang-tab" class="tab-content"></div>
+                    <div id="market-tab" class="tab-content grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                    <div id="inventory-tab" class="tab-content grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                    <div id="news-tab" class="tab-content"></div>
+                </div>
+            </main>
+            
+            <aside class="w-full lg:w-1/4 flex flex-col gap-4">
+                 <div class="panel p-4 rounded-lg flex-grow flex flex-col">
+                    <h2 class="text-xl font-bold text-gold mb-2 border-b-2 border-b-[var(--border-color)] pb-2">Ledger</h2>
+                    <div id="log-panel" class="flex-grow space-y-2 text-sm pr-2 scrollable-panel"></div>
+                </div>
+            </aside>
+        </div>
+        
+        <div class="news-ticker rounded-lg">
+            <div id="news-feed" class="news-item"></div>
+        </div>
+    </div>
+    
+    <div id="modal-container" class="pointer-events-none"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'north-bergen-rpg';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEMO", authDomain: "DEMO", projectId: "DEMO" };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let gameState = {};
+        let userId = null, playerDocRef = null, unsubscribePlayer = null;
+        
+        const synths = {
+            cash: new Tone.Synth().toDestination(),
+            fail: new Tone.NoiseSynth().toDestination(),
+            jail: new Tone.Synth({ oscillator: { type: "sawtooth" } }).toDestination(),
+            levelUp: new Tone.PolySynth(Tone.Synth).toDestination(),
+            buy: new Tone.Synth({ oscillator: { type: "triangle" } }).toDestination(),
+            jobComplete: new Tone.Synth().toDestination(),
+            turfAttack: new Tone.NoiseSynth().toDestination(),
+            siren: new Tone.Synth({ oscillator: { type: 'sine' } }).toDestination(),
+        };
+
+        // --- GAME DATA ---
+        const CRIMES = [
+            { id: 'mug', name: 'Shake Down', time: 15, turf: ['slums', 'old_town'], skill: 'intimidation', xp: 10, icon: 'fa-hand-fist', cost: 10, cooldown: 5, success: { cash: [20, 150], respect: [1, 5], heat: 2 }, failure: { health: [5, 10], wanted: 1, heat: 1 } },
+            { id: 'steal_car', name: 'Boost a Ride', time: 30, turf: ['docks', 'industrial'], skill: 'stealth', xp: 20, icon: 'fa-car', cost: 20, cooldown: 8, success: { cash: [100, 500], respect: [5, 15], heat: 3 }, failure: { health: [10, 20], wanted: 2, heat: 2 } },
+            { id: 'deal_drugs', name: 'Move Product', time: 60, turf: ['market', 'slums'], skill: 'streetSmarts', xp: 15, icon: 'fa-box', cost: 15, cooldown: 6, success: { cash: [50, 300], respect: [2, 10], heat: 4 }, failure: { health: [5, 15], wanted: 3, heat: 2 } },
+            { id: 'lay_low', name: 'Lay Low', time: 120, turf: [], skill: 'streetSmarts', xp: 5, icon: 'fa-user-ninja', cost: 20, cooldown: 60, success: { wanted: -2 }, failure: { wanted: 0 } },
+            { id: 'heist', name: 'Warehouse Heist', time: 240, turf: ['industrial'], skill: 'stealth', xp: 100, icon: 'fa-warehouse', cost: 50, cooldown: 120, success: { cash: [2000, 10000], respect: [50, 150], heat: 10 }, failure: { health: [40, 80], wanted: 10, heat: 5 }, req: { level: 3, item: 'lockpick', health: 60 } },
+        ];
+        const MARKET_ITEMS = [
+            { id: 'knuckles', name: 'Brass Knuckles', price: 450, desc: '+10% success on Shake Downs.', type: 'gear', icon: 'fa-hand-rock' },
+            { id: 'lockpick', name: 'Lockpick Kit', price: 1200, desc: 'Unlocks the Warehouse Heist.', type: 'gear', icon: 'fa-key' },
+            { id: 'vest', name: 'Bulletproof Vest', price: 2500, desc: 'Reduces health loss from failures by 25%.', type: 'gear', icon: 'fa-tshirt' },
+            { id: 'painkillers', name: 'Painkillers', price: 150, desc: 'Instantly restores 25 Health.', type: 'consumable' },
+            { id: 'energy_drink', name: 'Energy Drink', price: 200, desc: 'Instantly restores 20 Energy.', type: 'consumable' },
+        ];
+        const SKILL_TREE = {
+            brute_force: { name: 'Brute Force', desc: '+10% success on Shake Downs.', cost: 1, requires: [] },
+            ghost_steps: { name: 'Ghost Steps', desc: '+15% success on stealth crimes.', cost: 2, requires: [] },
+            silver_tongue: { name: 'Silver Tongue', desc: 'Unlock new NPC dialog paths.', cost: 3, requires: ['ghost_steps'] },
+            efficient_hustler: { name: 'Efficient Hustler', desc: 'Jobs take 10% less time.', cost: 2, requires: [] },
+        };
+        const BUSINESSES = {
+            deli: { name: 'Corner Deli', price: 10000, income_per_hour: 50, laundering: 0.1 },
+            auto_shop: { name: 'Auto Shop', price: 30000, income_per_hour: 150, laundering: 0.2 },
+            crypto_kiosk: { name: 'Crypto Kiosk', price: 50000, income_per_hour: 250, laundering: 0.3 },
+        };
+        const LORE = {
+            north_bergen: { title: "North Bergen", content: "A city of broken dreams and concrete promises. Built on the bones of industry, it's now a playground for the ambitious and the desperate. The law is a suggestion, and power is the only currency that matters." },
+            vultures: { title: "Red Vultures", content: "They value strength above all. Their methods are crude, but effective. They control the docks and the slums through fear and brute force." },
+            spiders: { title: "Neon Spiders", content: "Information is their weapon. They thrive in the digital shadows, dealing in secrets and high-tech contraband. Their influence is felt in the market and the data streams." },
+            serpents: { title: "Iron Serpents", content: "Old money and older traditions. The Serpents see themselves as the true aristocracy of the underworld. They control the banks, the businesses, and the politicians." }
+        };
+        const GANGS = {
+            vultures: { name: 'Red Vultures', color: 'var(--gang-vultures)', bonus: { type: 'mug_success', value: 5 }, desc: 'Brutal and direct, they rule the streets with an iron fist.' },
+            spiders: { name: 'Neon Spiders', color: 'var(--gang-spiders)', bonus: { type: 'drugs_profit', value: 5 }, desc: 'Masters of stealth and information, their web covers the city.' },
+            serpents: { name: 'Iron Serpents', color: 'var(--gang-serpents)', bonus: { type: 'heist_reward', value: 10 }, desc: 'Strategic and wealthy, they control the city\'s finances.' },
+        };
+        const GANG_RANKS = [ { name: 'Outsider', rep: 0 }, { name: 'Recruit', rep: 100 }, { name: 'Enforcer', rep: 500, bonus: { energyRegen: 0.2 } }, { name: 'Lieutenant', rep: 2000, bonus: { energyRegen: 0.5 } }, { name: 'Underboss', rep: 10000, bonus: { energyRegen: 1 } } ];
+        const TURF_MAP = {
+            'docks': { name: 'South Docks', income: 50 }, 'industrial': { name: 'Industrial Zone', income: 75 },
+            'old_town': { name: 'Old Town', income: 40 }, 'market': { name: 'Central Market', income: 100 },
+            'uptown': { name: 'Uptown Heights', income: 150 }, 'slums': { name: 'The Slums', income: 25 },
+        };
+        const JOBS = [
+            { id: 'delivery', name: 'Package Delivery', duration: 60, reward: { cash: 300, rep: 10 }, req: { gang: null } },
+            { id: 'hack', name: 'Hack Security', duration: 120, reward: { xp: 50, rep: 20 }, req: { gang: 'spiders' } },
+            { id: 'muscle', name: 'Muscle for Hire', duration: 90, reward: { cash: 500, rep: 25 }, req: { gang: 'vultures' } },
+            { id: 'laundering', name: 'Money Laundering', duration: 180, reward: { cash: 1000, rep: 30 }, req: { gang: 'serpents' } },
+        ];
+        const SAFHOUSES = {
+            'basic': { name: 'Basic Hideout', price: 0, healthRegen: 0.1 },
+            'apartment': { name: 'Abandoned Apartment', price: 5000, healthRegen: 0.2 },
+            'loft': { name: 'Downtown Loft', price: 15000, healthRegen: 0.4 },
+            'bunker': { name: 'Hidden Bunker', price: 50000, healthRegen: 0.8 },
+        };
+        const NPCS = {
+            vince: { name: 'Slick Vince', quests: [{ step: 0, text: "Hey kid, you got potential. Bring me $1000 and I'll make you an offer.", req: { cash: 1000 }, reward: { respect: 50, nextStep: 1 } }, {step: 1, text: "Good. Now, take over the Docks for me. I need a foothold there.", req: { turf: 'docks' }, reward: { cash: 2000, perk: 'vince_favor' }}] },
+            cass: { name: 'Cass', quests: [{ step: 0, text: "I hear things. The cops are planning a raid on the Industrial Zone. Lay low for a bit, then come see me.", req: { wanted: 0 }, reward: { xp: 100, nextStep: 1 } }, {step: 1, text: "Smart move. Now, I need some leverage. Get me a police scanner from the market.", req: { item: 'scanner' }, reward: { cash: 3000, perk: 'cass_intel' }}] }
+        };
+        const RIVAL_GANGS = {
+            crimson_jaw: { name: 'Crimson Jaw', color: 'var(--rival-crimson)' },
+            third_floor: { name: 'The 3rd Floor', color: 'var(--rival-3rdfloor)' },
+            sons_of_iron: { name: 'Sons of Iron', color: 'var(--rival-iron)' },
+        };
+        const HEISTS = {
+            bank_job: { name: 'Downtown Bank Heist', stages: [{ name: 'Scout Location', cost: 50, duration: 300 }, { name: 'Acquire Blueprints', req: { item: 'lockpick' } }, { name: 'Execute Heist', req: { gangRank: 'Enforcer' } }], reward: { cash: 50000, respect: 200 } }
+        };
+        
+        let UIElements = {};
+
+        // --- INITIALIZATION ---
+        function initializeGameState() {
+            gameState = {
+                alias: null, background: null,
+                dirtyCash: 0, cleanCash: 500, respect: 0, energy: 100, health: 100, wanted: 0,
+                isJailed: false, jailTime: 0,
+                level: 1, xp: 0, xpToNextLevel: 100, maxEnergy: 100, skillPoints: 0,
+                skills: { intimidation: 0, stealth: 0, streetSmarts: 0 }, unlockedSkills: [],
+                inventory: [], equippedGear: [],
+                gang: null, gangRep: 0,
+                turf: {}, turfHeat: {}, jobs: [],
+                safehouse: 'basic', ownedBusinesses: [],
+                npcProgress: {}, pvpHistory: { wins: 0, losses: 0 },
+                newsFeed: [],
+                gameTime: new Date('2002-01-01T08:00:00').getTime(),
+                lastRealTimeCheck: Date.now(),
+                activeHeists: {},
+                hardcore: false,
+            };
+        }
+        
+        function initializeUIElements() {
+            UIElements = {
+                stats: document.getElementById('stats-panel'),
+                gear: document.getElementById('gear-panel'),
+                log: document.getElementById('log-panel'),
+                playerId: document.getElementById('player-id'),
+                tabsContainer: document.getElementById('tabs-container'),
+                mainContentPanel: document.getElementById('main-content-panel'),
+                modalContainer: document.getElementById('modal-container'),
+                newsFeed: document.getElementById('news-feed'),
+                gameTimeDisplay: document.getElementById('game-time-display'),
+                playerAlias: document.getElementById('player-alias'),
+            };
+        }
+
+        // --- UI RENDERING ---
+        function updateAllUI() {
+            if (!gameState.alias) return;
+            updateStatsUI(); 
+            const activeTab = UIElements.tabsContainer.querySelector('.active')?.dataset.tab;
+            if (activeTab) renderTabContent(activeTab);
+            renderNews();
+            renderGear();
+        }
+
+        function renderTabContent(tabId) {
+            const container = UIElements.mainContentPanel.querySelector(`#${tabId}-tab`);
+            if (!container) return;
+
+            UIElements.mainContentPanel.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none';
+            });
+            
+            if (tabId === 'crimes') renderCrimes();
+            else if (tabId === 'skills') renderSkillTree();
+            else if (tabId === 'businesses') renderBusinesses();
+            else if (tabId === 'turf') renderTurfMap();
+            else if (tabId === 'gang') renderGangInfo();
+            else if (tabId === 'market') renderMarket();
+            else if (tabId === 'inventory') renderInventory();
+            else if (tabId === 'lore') renderLore();
+            else if (tabId === 'news') renderNewsTab();
+            else if (tabId === 'contacts') renderContacts();
+            else if (tabId === 'fights') renderFights();
+            else if (tabId === 'safehouse') renderSafehouse();
+            else if (tabId === 'heists') renderHeists();
+            
+            container.style.display = ['crimes', 'market', 'inventory', 'skills', 'businesses', 'turf'].includes(tabId) ? 'grid' : 'block';
+            container.classList.add('active');
+        }
+
+        function updateStatsUI() {
+            UIElements.playerAlias.textContent = gameState.alias;
+            UIElements.gameTimeDisplay.textContent = formatGameTime(new Date(gameState.gameTime));
+            const rank = getCurrentRank();
+            const cashDisplay = `
+                <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2"><i class="fas fa-money-bill-wave w-4 text-center" style="color:var(--clean-cash)"></i> Clean Cash</span><span>$${Math.floor(gameState.cleanCash).toLocaleString()}</span></div>
+                <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2"><i class="fas fa-sack-dollar w-4 text-center" style="color:var(--dirty-cash)"></i> Dirty Cash</span><span>$${Math.floor(gameState.dirtyCash).toLocaleString()}</span></div>
+            `;
+            UIElements.stats.innerHTML = `
+                ${createStatDisplay('Level', 'fa-star', gameState.level, 'text-gold')}
+                ${createStatBar('XP', 'fa-gem', (gameState.xp / gameState.xpToNextLevel) * 100, 'xp', `${gameState.xp}/${gameState.xpToNextLevel}`)}
+                <hr class="border-gray-700 my-2">
+                ${cashDisplay}
+                ${createStatDisplay('Respect', 'fa-crown', gameState.respect.toLocaleString(), 'text-gold')}
+                ${createStatBar('Health', 'fa-heart-pulse', (gameState.health / 100) * 100, 'health')}
+                ${createStatBar('Energy', 'fa-bolt', (gameState.energy / gameState.maxEnergy) * 100, 'energy')}
+                ${createStatDisplay('Heat', 'fa-fire', '🔥'.repeat(gameState.wanted) || 'None', 'text-orange-500')}
+                <hr class="border-gray-700 my-2">
+                <h3 class="text-lg text-gold mb-1">Skills</h3>
+                ${createStatDisplay('Intimidation', 'fa-hand-fist', gameState.skills.intimidation, 'text-red-400')}
+                ${createStatDisplay('Stealth', 'fa-user-secret', gameState.skills.stealth, 'text-blue-400')}
+                ${createStatDisplay('Street Smarts', 'fa-brain', gameState.skills.streetSmarts, 'text-purple-400')}
+                ${gameState.gang ? `<hr class="border-gray-700 my-2"><h3 class="text-lg text-gold mb-1" style="color: ${GANGS[gameState.gang].color}">${GANGS[gameState.gang].name}</h3>
+                ${createStatDisplay('Rank', 'fa-chess-king', rank.name, 'text-gold')}
+                ${createStatBar('Reputation', 'fa-award', (gameState.gangRep / (getNextRank()?.rep || rank.rep)) * 100, 'rep', `${gameState.gangRep} / ${getNextRank()?.rep || 'MAX'}`)}` : ''}
+            `;
+        }
+        
+        function createStatDisplay(name, icon, value, color) { return `<div><div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2"><i class="fas ${icon} ${color} w-4 text-center"></i> ${name}</span><span class="font-bold font-['Lora']">${value}</span></div></div>`; }
+        function createStatBar(name, icon, value, type, text) {
+            const colorClass = `stat-bar-fill-${type}`;
+            return `<div><div class="flex justify-between items-center text-sm mb-1"><span class="flex items-center gap-2"><i class="fas ${icon} w-4 text-center"></i> ${name}</span><span class="font-bold">${text || Math.round(value)+'%'}</span></div><div class="w-full stat-bar-bg rounded-full h-2.5"><div class="stat-bar-fill ${colorClass} h-2.5 rounded-full" style="width: ${value}%"></div></div></div>`;
+        }
+
+        function renderCrimes() { document.getElementById('crimes-tab').innerHTML = CRIMES.map(c => createActionButton(c, 'crime')).join(''); }
+        function renderMarket() { document.getElementById('market-tab').innerHTML = MARKET_ITEMS.map(i => createActionButton(i, 'market')).join(''); }
+        function renderInventory() {
+            const container = document.getElementById('inventory-tab');
+            const inventoryCounts = gameState.inventory.reduce((acc, id) => { acc[id] = (acc[id] || 0) + 1; return acc; }, {});
+            if (Object.keys(inventoryCounts).length === 0) { container.innerHTML = `<p class="col-span-full text-center text-gray-500">Your pockets are empty.</p>`; return; }
+            container.innerHTML = Object.keys(inventoryCounts).map(id => createActionButton(MARKET_ITEMS.find(i => i.id === id), 'inventory', inventoryCounts[id])).join('');
+        }
+        function renderGear() { UIElements.gear.innerHTML = gameState.equippedGear.map(id => `<i class="fas ${MARKET_ITEMS.find(i=>i.id===id).icon || 'fa-question-circle'} text-gold text-2xl" title="${MARKET_ITEMS.find(i=>i.id===id).name}"></i>`).join(''); }
+        function renderJobs() {
+            document.getElementById('jobs-tab').innerHTML = JOBS.filter(j => j.req.gang === null || j.req.gang === gameState.gang).map(job => {
+                const activeJob = gameState.jobs.find(j => j.id === job.id);
+                const timeLeft = activeJob ? (activeJob.startTime + activeJob.duration) - Date.now() : 0;
+                return `<div class="panel p-4 rounded-lg flex justify-between items-center"><div><h4 class="text-gold font-bold">${job.name}</h4><p class="text-xs text-gray-400">Reward: ${job.reward.cash ? `$${job.reward.cash}`:''} ${job.reward.xp ? `${job.reward.xp} XP`:''} ${job.reward.rep ? `${job.reward.rep} Rep`:''}</p></div>${activeJob ? `<span id="job-timer-${job.id}">${Math.ceil(timeLeft / 1000)}s</span>` : `<button data-job-id="${job.id}" class="btn-action p-2 rounded-md">Start (${job.duration}s)</button>`}</div>`;
+            }).join('');
+        }
+        function renderTurfMap() {
+             document.getElementById('turf-tab').innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-3 gap-2">${Object.keys(TURF_MAP).map(id => {
+                const turf = TURF_MAP[id]; const owner = gameState.turf[id]?.owner; const heat = gameState.turfHeat[id] || 0;
+                const ownerColor = owner ? GANGS[owner]?.color || RIVAL_GANGS[owner]?.color : '';
+                return `<div class="turf-tile panel p-2 text-center rounded-lg border-2" style="border-color: ${ownerColor || 'var(--border-color)'}" title="Owner: ${owner ? (GANGS[owner]?.name || RIVAL_GANGS[owner]?.name) : 'Neutral'}\nIncome: $${turf.income}/min\nHeat: ${Math.round(heat)}">
+                    <div class="heat-overlay" style="opacity: ${heat / 100};"></div>
+                    <p class="font-bold text-sm relative z-10">${turf.name}</p>
+                    <button data-turf-id="${id}" class="btn-action text-xs p-1 mt-2 w-full relative z-10" ${!gameState.gang || owner === gameState.gang ? 'disabled' : ''}>Attack</button>
+                </div>`;
+            }).join('')}</div>`;
+        }
+        function renderGangInfo() {
+            const container = document.getElementById('gang-tab');
+            if (!container) return;
+            if (!gameState.gang) { container.innerHTML = `<p class="text-center text-gray-500">Join a gang at Level 3 to see this tab.</p>`; return; }
+            const gang = GANGS[gameState.gang];
+            container.innerHTML = `<div class="text-center"><h2 class="text-3xl font-bold" style="color: ${gang.color};">${gang.name}</h2><p class="italic my-4">${gang.desc}</p><p><strong>Bonus:</strong> +${gang.bonus.value}% ${gang.bonus.type.replace('_', ' ')}</p></div>`;
+        }
+        function renderSafehouse() {
+            const container = document.getElementById('safehouse-tab');
+            const currentSafehouse = SAFHOUSES[gameState.safehouse];
+            container.innerHTML = `
+                <div class="text-center">
+                    <h2 class="text-2xl text-gold">${currentSafehouse.name}</h2>
+                    <p class="text-gray-400">Current Health Regen Bonus: +${currentSafehouse.healthRegen}/sec</p>
+                </div>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${Object.keys(SAFHOUSES).map(id => {
+                        const house = SAFHOUSES[id];
+                        const isOwned = Object.keys(SAFHOUSES).indexOf(gameState.safehouse) >= Object.keys(SAFHOUSES).indexOf(id);
+                        return `<div class="panel p-4 rounded-lg text-center">
+                            <h3 class="text-xl text-gold">${house.name}</h3>
+                            <p class="text-sm my-2">Health Regen: +${house.healthRegen}/sec</p>
+                            <button data-safehouse-id="${id}" class="btn-action w-full p-2 mt-2" ${isOwned || gameState.cleanCash < house.price ? 'disabled' : ''}>
+                                ${isOwned ? 'Owned' : `Buy ($${house.price.toLocaleString()})`}
+                            </button>
+                        </div>`
+                    }).join('')}
+                </div>
+            `;
+        }
+        function renderContacts() { document.getElementById('contacts-tab').innerHTML = `<p class="text-center text-gray-500">Coming soon.</p>`; }
+        function renderFights() { document.getElementById('fights-tab').innerHTML = `<p class="text-center text-gray-500">Coming soon.</p>`; }
+        function renderSkillTree() {
+            const container = document.getElementById('skills-tab');
+            container.innerHTML = `
+                <div class="text-center mb-4">
+                    <h2 class="text-2xl text-gold">Skill Tree</h2>
+                    <p>Available Skill Points: <span class="font-bold text-gold">${gameState.skillPoints}</span></p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${Object.keys(SKILL_TREE).map(id => {
+                        const skill = SKILL_TREE[id];
+                        const isUnlocked = gameState.unlockedSkills.includes(id);
+                        const canUnlock = !isUnlocked && gameState.skillPoints >= skill.cost && skill.requires.every(req => gameState.unlockedSkills.includes(req));
+                        return `<div class="skill-node p-4 rounded-lg text-center ${isUnlocked ? 'unlocked' : ''} ${canUnlock ? 'can-unlock' : 'opacity-50'}" data-skill-id="${id}">
+                            <h4 class="font-bold text-lg">${skill.name}</h4>
+                            <p class="text-xs text-muted my-2">${skill.desc}</p>
+                            <p class="font-bold text-gold">Cost: ${skill.cost} SP</p>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
+        }
+        function renderBusinesses() {
+            const container = document.getElementById('businesses-tab');
+            container.innerHTML = `
+                <div class="text-center mb-4">
+                    <h2 class="text-2xl text-gold">Front Businesses</h2>
+                    <p>Launder dirty money into clean cash.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${Object.keys(BUSINESSES).map(id => {
+                        const biz = BUSINESSES[id];
+                        const isOwned = gameState.ownedBusinesses.includes(id);
+                        return `<div class="panel p-4 rounded-lg text-center">
+                            <h3 class="text-xl text-gold">${biz.name}</h3>
+                            <p class="text-sm my-2">Laundering Rate: ${biz.laundering * 100}% per hour</p>
+                            <p class="text-sm my-2">Passive Income: $${biz.income_per_hour}/hour</p>
+                            <button class="btn-action w-full p-2 mt-2" data-biz-id="${id}" ${isOwned || gameState.cleanCash < biz.price ? 'disabled' : ''}>
+                                ${isOwned ? 'Owned' : `Buy ($${biz.price.toLocaleString()})`}
+                            </button>
+                        </div>`
+                    }).join('')}
+                </div>
+                <div class="mt-6 panel p-4 rounded-lg">
+                    <h3 class="text-xl text-gold text-center">Launder Money</h3>
+                    <p class="text-center text-sm text-muted">Amount to launder ($${Math.floor(gameState.dirtyCash).toLocaleString()} available)</p>
+                    <div class="flex items-center gap-2 mt-2">
+                        <input type="number" id="launder-amount" class="w-full bg-gray-800 text-white p-2 rounded" placeholder="0">
+                        <button id="max-launder-btn" class="btn-action p-2">Max</button>
+                    </div>
+                    <button id="launder-btn" class="btn-action w-full p-2 mt-2">Start Laundering</button>
+                </div>
+            `;
+        }
+        function renderNews() {
+            const feed = UIElements.newsFeed;
+            if (feed) feed.innerHTML = gameState.newsFeed.map(item => `<span>*** ${item} ***</span>`).join('');
+        }
+        function renderNewsTab() {
+            const container = document.getElementById('news-tab');
+            container.innerHTML = `<div class="space-y-2">${[...gameState.newsFeed].reverse().map(item => `
+                <p class="text-gray-400 border-b border-gray-800 pb-2"><i class="fas fa-newspaper mr-2"></i>${item}</p>
+            `).join('')}</div>`;
+        }
+        function renderLore() {
+            document.getElementById('lore-tab').innerHTML = `<div class="space-y-4">${Object.values(LORE).map(entry => `
+                <details class="panel p-4 rounded-lg">
+                    <summary class="text-xl text-gold cursor-pointer">${entry.title}</summary>
+                    <p class="text-gray-300 mt-2">${entry.content}</p>
+                </details>
+            `).join('')}</div>`;
+        }
+        function renderHeists() {
+            const container = document.getElementById('heists-tab');
+            container.innerHTML = `<div class="space-y-4">${Object.keys(HEISTS).map(id => {
+                const heist = HEISTS[id];
+                const activeHeist = gameState.activeHeists[id] || { stage: 0 };
+                return `<div class="panel p-4 rounded-lg">
+                    <h3 class="text-2xl text-gold">${heist.name}</h3>
+                    <ul class="list-disc list-inside my-2">
+                        ${heist.stages.map((stage, index) => `<li class="${activeHeist.stage > index ? 'completed' : activeHeist.stage === index ? 'active' : ''}">${stage.name}</li>`).join('')}
+                    </ul>
+                    <button class="btn-action w-full" data-heist-id="${id}">${activeHeist.stage >= heist.stages.length ? 'Completed' : `Start: ${heist.stages[activeHeist.stage].name}`}</button>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function createActionButton(item, type, count = 1) {
+            if (type === 'crime') {
+                const hasReqs = checkRequirements(item); const successChance = calculateSuccessChance(item);
+                return `<button data-crime-id="${item.id}" class="btn-action w-full h-full p-3 rounded-lg flex flex-col items-center justify-center gap-1 text-base relative" ${!hasReqs.passed ? 'disabled' : ''} title="${!hasReqs.passed ? hasReqs.reason : `Success: ~${successChance}%`}"><i class="fas ${item.icon} text-2xl text-gold"></i><span>${item.name}</span><span class="text-xs text-muted">Cost: ${item.cost} Energy</span><span class="text-xs text-muted">Time: ${item.time} mins</span><span class="text-xs text-cyan-300">~${successChance}%</span>${!hasReqs.passed ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><i class="fas fa-lock text-2xl"></i></div>` : ''}</button>`;
+            } else if (type === 'market') {
+                return `<div class="panel rounded-lg p-3 flex flex-col text-center"><h4 class="text-gold font-bold">${item.name}</h4><p class="text-xs text-gray-400 flex-grow my-2">${item.desc}</p><button data-item-id="${item.id}" data-action="buy" class="btn-action p-2 rounded-md mt-auto" ${gameState.cleanCash < item.price || (item.type !== 'consumable' && gameState.inventory.includes(item.id)) ? 'disabled' : ''}>Buy ($${item.price.toLocaleString()})</button></div>`;
+            } else if (type === 'inventory') {
+                const isEquipped = gameState.equippedGear.includes(item.id);
+                return `<div class="panel rounded-lg p-3 flex flex-col text-center border-2 ${isEquipped ? 'border-yellow-400' : 'border-transparent'}"><h4 class="text-gold font-bold">${item.name} ${count > 1 ? `(x${count})` : ''}</h4><p class="text-xs text-gray-400 flex-grow my-2">${item.desc}</p>${item.type === 'consumable' ? `<button data-item-id="${item.id}" data-action="use" class="btn-action p-2 rounded-md mt-auto">Use</button>` : `<button data-item-id="${item.id}" data-action="toggle" class="btn-action p-2 rounded-md mt-auto">${isEquipped ? 'Unequip' : 'Equip'}</button>`}</div>`;
+            }
+        }
+        
+        function addEventListeners() {
+            UIElements.mainContentPanel.addEventListener('click', e => {
+                const button = e.target.closest('button.btn-action, .skill-node');
+                if (!button) return;
+                
+                const { crimeId, itemId, action, jobId, turfId, safehouseId, skillId, bizId, heistId } = button.dataset;
+
+                if (crimeId) handleCrime(crimeId);
+                if (jobId) startJob(jobId);
+                if (turfId) attackTurf(turfId);
+                if (safehouseId) buySafehouse(safehouseId);
+                if (skillId) unlockSkill(skillId);
+                if (bizId) buyBusiness(bizId);
+                if (heistId) startHeistStage(heistId);
+                if (itemId) {
+                    if (action === 'buy') buyItem(itemId);
+                    if (action === 'use') useItem(itemId);
+                    if (action === 'toggle') toggleGear(itemId);
+                }
+                if (button.id === 'launder-btn') startLaundering();
+                if (button.id === 'max-launder-btn') {
+                    document.getElementById('launder-amount').value = Math.floor(gameState.dirtyCash);
+                }
+            });
+
+            UIElements.tabsContainer.addEventListener('click', e => {
+                const button = e.target.closest('.tab-button');
+                if (!button) return;
+                UIElements.tabsContainer.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                renderTabContent(button.dataset.tab);
+            });
+        }
+
+        // --- GAME LOGIC ---
+        function handleCrime(crimeId) {
+            const crime = CRIMES.find(c => c.id === crimeId);
+            const turfId = crime.turf.length > 0 ? crime.turf[Math.floor(Math.random() * crime.turf.length)] : null;
+            const heat = turfId ? (gameState.turfHeat[turfId] || 0) : 0;
+            const hasReqs = checkRequirements(crime);
+            if (gameState.isJailed || gameState.energy < crime.cost || !hasReqs.passed) return;
+            
+            const btn = UIElements.mainContentPanel.querySelector(`[data-crime-id="${crimeId}"]`);
+            if(btn) { btn.disabled = true; setTimeout(() => { if(btn) btn.disabled = false; }, crime.cooldown * 1000); }
+
+            gameState.energy -= crime.cost;
+            
+            if (crime.id === 'lay_low') { gameState.wanted = Math.max(0, gameState.wanted + crime.success.wanted); logMessage('You lay low for a while, reducing your Heat.', 'success'); advanceGameTime(crime.time); return; }
+
+            const successChance = calculateSuccessChance(crime, heat);
+            if (Math.random() * 100 < successChance) {
+                let cashGained = Math.floor(Math.random() * (crime.success.cash[1] - crime.success.cash[0] + 1)) + crime.success.cash[0];
+                gameState.dirtyCash += cashGained;
+
+                const respectGained = Math.floor(Math.random() * (crime.success.respect[1] - crime.success.respect[0] + 1)) + crime.success.respect[0];
+                gameState.respect += respectGained;
+                gameState.skills[crime.skill] = (gameState.skills[crime.skill] || 0) + 1;
+                if(turfId) gameState.turfHeat[turfId] = Math.min(100, heat + crime.success.heat);
+                addXP(crime.xp);
+                logMessage(`Success: ${crime.name}. +$${cashGained.toLocaleString()} (Dirty), +${respectGained} respect, +${crime.xp} XP`, 'success');
+                synths.cash.triggerAttackRelease("C5", "8n");
+            } else {
+                let healthLost = Math.floor(Math.random() * (crime.failure.health[1] - crime.failure.health[0] + 1)) + crime.failure.health[0];
+                if (gameState.equippedGear.includes('vest')) healthLost = Math.round(healthLost * 0.75);
+                gameState.health = Math.max(0, gameState.health - healthLost);
+                if (gameState.health <= 0) { handleDeath(); return; }
+                gameState.wanted = Math.min(10, gameState.wanted + crime.failure.wanted);
+                if(turfId) gameState.turfHeat[turfId] = Math.min(100, heat + crime.failure.heat);
+                logMessage(`Failure: ${crime.name}. Lost ${healthLost} health.`, 'fail');
+                if (gameState.wanted > 3 && Math.random() < 0.2 * gameState.wanted) goToJail();
+            }
+            advanceGameTime(crime.time);
+        }
+        
+        function handleDeath() {
+            if (gameState.hardcore) {
+                const legacy = {
+                    alias: gameState.alias,
+                    level: gameState.level,
+                    respect: gameState.respect,
+                    gang: gameState.gang,
+                    cause: 'Fell in battle',
+                    date: new Date().toISOString(),
+                };
+                const legacies = JSON.parse(localStorage.getItem('north_bergen_legacies') || '[]');
+                legacies.push(legacy);
+                localStorage.setItem('north_bergen_legacies', JSON.stringify(legacies));
+                
+                playerDocRef = null;
+                showModal('permadeath', legacy);
+            } else {
+                logMessage('You blacked out... but live to fight another day.', 'fail');
+                gameState.health = 25; // Respawn with low health
+                gameState.wanted = 0;
+                updateAllUI();
+            }
+        }
+
+        function checkRequirements(crime) {
+            if (!crime.req) return { passed: true };
+            if (crime.req.level && gameState.level < crime.req.level) return { passed: false, reason: `Requires Level ${crime.req.level}` };
+            if (crime.req.item && !gameState.inventory.includes(crime.req.item)) return { passed: false, reason: `Requires ${MARKET_ITEMS.find(i => i.id === crime.req.item).name}` };
+            if (crime.req.health && gameState.health < crime.req.health) return { passed: false, reason: `Requires ${crime.req.health} Health` };
+            return { passed: true };
+        }
+
+        function calculateSuccessChance(crime, heat = 0) {
+            let chance = 65;
+            chance -= heat * 0.2; // Heat penalty
+            chance += (gameState.skills[crime.skill] || 0) * 0.5;
+            if (crime.id === 'mug' && gameState.gang === 'vultures') chance += GANGS.vultures.bonus.value;
+            if (crime.id === 'mug' && gameState.equippedGear.includes('knuckles')) chance += 10;
+            if (gameState.unlockedSkills.includes('brute_force') && crime.skill === 'intimidation') chance += 10;
+            if (gameState.unlockedSkills.includes('ghost_steps') && crime.skill === 'stealth') chance += 15;
+            chance -= gameState.wanted * 2;
+            return Math.max(5, Math.min(99, Math.round(chance)));
+        }
+
+        function addXP(amount) { gameState.xp += amount; if (gameState.xp >= gameState.xpToNextLevel) levelUp(); }
+        function levelUp() {
+            gameState.level++; gameState.xp -= gameState.xpToNextLevel;
+            gameState.xpToNextLevel = Math.round(gameState.xpToNextLevel * 1.5);
+            gameState.maxEnergy += 5; gameState.energy = gameState.maxEnergy; gameState.health = 100;
+            gameState.skillPoints++;
+            showModal('levelup');
+            synths.levelUp.triggerAttackRelease(["C4", "E4", "G4", "C5"], "1n");
+            if (gameState.level === 3 && !gameState.gang) setTimeout(() => showModal('gangChoice'), 4100);
+        }
+
+        function buyItem(id) {
+            const item = MARKET_ITEMS.find(i => i.id === id);
+            if (!item || gameState.cleanCash < item.price || (item.type !== 'consumable' && gameState.inventory.includes(id))) return;
+            gameState.cleanCash -= item.price; gameState.inventory.push(id);
+            logMessage(`Purchased ${item.name}.`, 'success'); synths.buy.triggerAttackRelease("A4", "8n");
+            updateAllUI(); saveGameState();
+        };
+
+        function useItem(id) {
+            const item = MARKET_ITEMS.find(i => i.id === id);
+            if (!item || !gameState.inventory.includes(id)) return;
+            if (item.id === 'painkillers') gameState.health = Math.min(100, gameState.health + 25);
+            if (item.id === 'energy_drink') gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 20);
+            
+            const itemIndex = gameState.inventory.indexOf(id);
+            if (itemIndex > -1) {
+                gameState.inventory.splice(itemIndex, 1);
+            }
+            
+            updateAllUI(); saveGameState();
+        };
+
+        function toggleGear(id) {
+            if (gameState.equippedGear.includes(id)) {
+                gameState.equippedGear = gameState.equippedGear.filter(g => g !== id);
+            } else {
+                gameState.equippedGear.push(id);
+            }
+            updateAllUI(); saveGameState();
+        };
+
+        function startJob(id) {
+            if (gameState.jobs.some(j => j.id === id)) return;
+            const job = JOBS.find(j => j.id === id);
+            let duration = job.duration * 1000;
+            if (gameState.unlockedSkills.includes('efficient_hustler')) duration *= 0.9;
+            gameState.jobs.push({ id: id, startTime: Date.now(), duration: duration });
+            renderJobs();
+        };
+
+        function attackTurf(id) {
+            if (!gameState.gang || gameState.energy < 50) return;
+            gameState.energy -= 50;
+            logMessage(`Attacking ${TURF_MAP[id].name}...`, 'info');
+            synths.turfAttack.triggerAttackRelease("2n");
+            setTimeout(() => {
+                const playerPower = gameState.level * 10 + gameState.gangRep * 0.1;
+                const enemyPower = (gameState.turfHeat[id] || 0) * 1.5;
+                if (playerPower > enemyPower) {
+                    gameState.turf[id] = { owner: gameState.gang };
+                    gameState.gangRep += 50;
+                    logMessage(`You conquered ${TURF_MAP[id].name} for the ${GANGS[gameState.gang].name}!`, 'success');
+                } else {
+                    logMessage(`Your attack on ${TURF_MAP[id].name} was repelled!`, 'fail');
+                    gameState.health -= 20;
+                }
+                updateAllUI();
+            }, 2000);
+        };
+
+        function joinGang(id) {
+            gameState.gang = id;
+            logMessage(`You have joined the ${GANGS[id].name}.`, 'success');
+            closeModal(); updateAllUI(); saveGameState();
+        };
+
+        function bailFromJail() {
+            const bailCost = gameState.level * 500;
+            if (gameState.cleanCash >= bailCost) {
+                gameState.cleanCash -= bailCost;
+                gameState.isJailed = false;
+                logMessage(`You paid $${bailCost} to get out of jail early.`, 'info');
+                closeModal(); updateAllUI();
+            } else {
+                logMessage('Not enough clean cash to post bail.', 'fail');
+            }
+        };
+        
+        function buySafehouse(id) {
+            const house = SAFHOUSES[id];
+            if (gameState.cleanCash >= house.price) {
+                gameState.cleanCash -= house.price;
+                gameState.safehouse = id;
+                logMessage(`You've upgraded to the ${house.name}.`, 'success');
+                updateAllUI(); saveGameState();
+            }
+        };
+
+        function unlockSkill(id) {
+            const skill = SKILL_TREE[id];
+            if (!skill || gameState.unlockedSkills.includes(id) || gameState.skillPoints < skill.cost || !skill.requires.every(req => gameState.unlockedSkills.includes(req))) return;
+            gameState.skillPoints -= skill.cost;
+            gameState.unlockedSkills.push(id);
+            logMessage(`Skill Unlocked: ${skill.name}`, 'success');
+            updateAllUI();
+            saveGameState();
+        }
+
+        function buyBusiness(id) {
+            const biz = BUSINESSES[id];
+            if (!biz || gameState.ownedBusinesses.includes(id) || gameState.cleanCash < biz.price) return;
+            gameState.cleanCash -= biz.price;
+            gameState.ownedBusinesses.push(id);
+            logMessage(`You are now the proud owner of ${biz.name}.`, 'success');
+            updateAllUI();
+            saveGameState();
+        }
+
+        function startLaundering() {
+            const amountInput = document.getElementById('launder-amount');
+            const amount = parseInt(amountInput.value);
+            if (isNaN(amount) || amount <= 0 || amount > gameState.dirtyCash) {
+                logMessage('Invalid amount.', 'fail');
+                return;
+            }
+            const launderedAmount = amount * 0.8; // 20% fee
+            gameState.dirtyCash -= amount;
+            gameState.cleanCash += launderedAmount;
+            logMessage(`Laundered $${amount.toLocaleString()} into $${launderedAmount.toLocaleString()} of clean cash.`, 'success');
+            updateAllUI();
+        }
+
+        function addNews(message) {
+            gameState.newsFeed.unshift(message);
+            if (gameState.newsFeed.length > 20) gameState.newsFeed.pop();
+            renderNews();
+        }
+
+        function applyCharacterBackground(background) {
+            gameState.background = background;
+            if (background === 'street_rat') gameState.skills.stealth += 5;
+            if (background === 'ex_military') { gameState.health += 20; gameState.skills.intimidation += 5; }
+            if (background === 'broker') gameState.cleanCash += 2000;
+        }
+        
+        function startHeistStage(heistId) {
+            const heist = HEISTS[heistId];
+            if (!heist) return;
+
+            let activeHeist = gameState.activeHeists[heistId];
+            if (!activeHeist) {
+                activeHeist = { stage: 0 };
+                gameState.activeHeists[heistId] = activeHeist;
+            }
+
+            if (activeHeist.stage >= heist.stages.length) {
+                logMessage(`${heist.name} is already completed.`, 'info');
+                return;
+            }
+
+            const currentStage = heist.stages[activeHeist.stage];
+            if (!currentStage) return;
+            
+            if (currentStage.cost && gameState.energy < currentStage.cost) {
+                logMessage(`Not enough energy to start ${currentStage.name}.`, 'fail');
+                return;
+            }
+            if (currentStage.req?.item && !gameState.inventory.includes(currentStage.req.item)) {
+                 logMessage(`You need a ${MARKET_ITEMS.find(i => i.id === currentStage.req.item).name} for this stage.`, 'fail');
+                 return;
+            }
+            if(currentStage.cost) gameState.energy -= currentStage.cost;
+
+            logMessage(`Starting stage: ${currentStage.name}`, 'info');
+            activeHeist.stage++;
+            logMessage(`Completed: ${currentStage.name}.`, 'success');
+
+            if(activeHeist.stage >= heist.stages.length){
+                logMessage(`Heist successful! You completed ${heist.name}.`, 'success');
+                if(heist.reward.cash) gameState.dirtyCash += heist.reward.cash;
+                if(heist.reward.respect) gameState.respect += heist.reward.respect;
+            }
+
+            updateAllUI();
+            saveGameState();
+        }
+
+        // --- TIMERS & REGEN & EVENTS ---
+        function goToJail() {
+            gameState.isJailed = true; gameState.jailTime = 60000;
+            showModal('jail'); synths.jail.triggerAttackRelease("C2", "1n");
+        }
+        
+        function advanceGameTime(minutes) {
+            const timePassedMs = minutes * 60 * 1000;
+            gameState.gameTime += timePassedMs;
+            processTimePassing(timePassedMs, false);
+            updateAllUI();
+            saveGameState();
+        }
+
+        function processTimePassing(ms, isRealTime = false) {
+             if (isRealTime) {
+                const energyRegenRate = 1 / (60 * 5); // 1 energy every 5 seconds
+                const energyGained = ms * energyRegenRate / 1000;
+                gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + energyGained);
+            } else {
+                const hoursPassed = ms / (1000 * 60 * 60);
+                let income = 0;
+                gameState.ownedBusinesses.forEach(bizId => {
+                    income += BUSINESSES[bizId].income_per_hour * hoursPassed;
+                });
+                if (income > 0) {
+                    gameState.cleanCash += income;
+                    logMessage(`Your businesses generated $${Math.floor(income).toLocaleString()}.`, 'success');
+                }
+
+                const lastNewsHour = Math.floor(gameState.lastNewsUpdate / (1000 * 60 * 60));
+                const currentHour = Math.floor(gameState.gameTime / (1000 * 60 * 60));
+                if (currentHour > lastNewsHour) {
+                    generateNews();
+                    gameState.lastNewsUpdate = gameState.gameTime;
+                }
+            }
+        }
+
+        function handleTimers(deltaTime) {
+            if (gameState.isJailed) {
+                gameState.jailTime -= deltaTime;
+                if (gameState.jailTime <= 0) {
+                    gameState.isJailed = false; closeModal();
+                    logMessage("You're out. Try to keep your nose clean... or don't.", 'info');
+                }
+                const timerEl = document.getElementById('jail-timer');
+                if (timerEl) timerEl.textContent = `${Math.ceil(gameState.jailTime / 1000)}s`;
+            }
+            gameState.jobs.forEach(job => {
+                const timeLeft = (job.startTime + job.duration) - Date.now();
+                const timerEl = document.getElementById(`job-timer-${job.id}`);
+                if (timerEl) timerEl.textContent = `${Math.ceil(timeLeft / 1000)}s`;
+            });
+        }
+
+        function handleGlobalEvents(deltaTime) {
+            Object.keys(gameState.turfHeat).forEach(id => {
+                gameState.turfHeat[id] = Math.max(0, gameState.turfHeat[id] - (deltaTime / 600000)); // Decays over 10 mins
+            });
+            const highHeatZones = Object.keys(gameState.turfHeat).filter(id => gameState.turfHeat[id] > 70);
+            if (highHeatZones.length > 0 && Math.random() < (deltaTime / 300000)) {
+                if (gameState.safehouse !== 'bunker') {
+                    const zone = highHeatZones[Math.floor(Math.random() * highHeatZones.length)];
+                    showModal('raid', { zone: TURF_MAP[zone].name });
+                    synths.siren.triggerAttackRelease("A5", "0.5s");
+                    const outcome = Math.random();
+                    if(outcome < 0.33) { gameState.dirtyCash *= 0.9; logMessage(`Police raid in ${TURF_MAP[zone].name}! You lost 10% of your dirty cash.`, 'fail'); }
+                    else if (outcome < 0.66) { gameState.health -= 25; logMessage(`Police raid in ${TURF_MAP[zone].name}! You got injured.`, 'fail'); }
+                    else { goToJail(); logMessage(`Police raid in ${TURF_MAP[zone].name}! You've been arrested!`, 'fail'); }
+                }
+            }
+        }
+
+        function regenerateStats(deltaTime) {
+            const rankBonus = getCurrentRank().bonus?.energyRegen || 0;
+            const safehouseBonus = SAFHOUSES[gameState.safehouse].healthRegen;
+            const energyPerSecond = 1 + rankBonus;
+            const incomePerMinute = Object.keys(gameState.turf).reduce((total, id) => {
+                return gameState.turf[id]?.owner === gameState.gang ? total + TURF_MAP[id].income : total;
+            }, 0);
+            let passiveIncome = 0;
+            gameState.ownedBusinesses.forEach(id => {
+                passiveIncome += BUSINESSES[id].income_per_hour;
+            });
+
+            if (!gameState.isJailed) {
+                gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + (energyPerSecond * deltaTime) / 1000);
+                gameState.health = Math.min(100, gameState.health + (safehouseBonus * deltaTime) / 1000);
+            }
+        }
+
+        // --- DATA & AUTH ---
+        async function saveGameState() {
+            if (!playerDocRef) return;
+            gameState.lastRealTimeCheck = Date.now();
+            const dataToSave = { ...gameState };
+            delete dataToSave.isJailed;
+            await setDoc(playerDocRef, dataToSave, { merge: true });
+        }
+
+        function setupPlayer(uid) {
+            userId = uid; 
+            if(UIElements.playerId) UIElements.playerId.textContent = userId;
+            playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/gamedata`, 'playerState');
+            if (unsubscribePlayer) unsubscribePlayer();
+            unsubscribePlayer = onSnapshot(playerDocRef, (docSnap) => {
+                if (docSnap.metadata.hasPendingWrites) return;
+                const defaultState = {}; initializeGameState(); Object.assign(defaultState, gameState);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    gameState = { ...defaultState, ...data };
+                    const elapsedTime = Date.now() - (gameState.lastRealTimeCheck || Date.now());
+                    processOfflineProgress(elapsedTime);
+                } 
+                
+                if (!gameState.alias) {
+                    showModal('characterCreation');
+                } else {
+                    updateAllUI();
+                }
+            });
+        }
+        
+        async function initializeAuth() {
+            onAuthStateChanged(auth, (user) => { if (user) setupPlayer(user.uid); });
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else await signInAnonymously(auth);
+            } catch (error) { console.error("Authentication failed:", error); }
+        }
+
+        // --- HELPERS ---
+        function getCurrentRank() { return [...GANG_RANKS].reverse().find(r => gameState.gangRep >= r.rep) || GANG_RANKS[0]; }
+        function getNextRank() { return GANG_RANKS.find(r => gameState.gangRep < r.rep); }
+        function logMessage(message, type = 'info') {
+            const color = type === 'success' ? 'text-green-300' : type === 'fail' ? 'text-red-400' : 'text-gray-400';
+            const logEntry = document.createElement('p');
+            logEntry.className = `${color} italic`;
+            logEntry.innerHTML = `&gt; ${message}`;
+            UIElements.log.prepend(logEntry);
+            if (UIElements.log.children.length > 100) UIElements.log.lastChild.remove();
+        }
+        function showModal(type, data = {}) {
+            let content = '';
+            if (type === 'jail') content = `<div class="modal-content p-8 rounded-lg text-center max-w-sm mx-auto"><i class="fas fa-gavel text-6xl text-dark-red mb-4"></i><h2 class="text-3xl font-bold mb-2">PINCHED!</h2><p class="text-gray-300 mb-4">You're doing time.</p><p class="text-4xl font-bold text-gold" id="jail-timer">${Math.ceil(gameState.jailTime / 1000)}s</p><button id="bail-button" class="btn-action p-2 rounded-md mt-4">Bail ($${(gameState.level * 500).toLocaleString()})</button></div>`;
+            if (type === 'levelup') content = `<div class="modal-content p-8 rounded-lg text-center max-w-sm mx-auto level-up-glow"><i class="fas fa-star text-6xl text-gold mb-4"></i><h2 class="text-4xl font-bold mb-2">LEVEL UP!</h2><p class="text-2xl text-white mb-4">You are now Level ${gameState.level}</p><p class="text-green-400">+1 Skill Point</p><p class="text-green-400">Health & Energy Restored</p></div>`;
+            if (type === 'gangChoice') content = `<div class="modal-content p-8 rounded-lg text-center max-w-md mx-auto"><h2 class="text-3xl font-bold mb-4">Choose Your Allegiance</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4">${Object.keys(GANGS).map(id => `<div class="panel p-4 rounded-lg text-center flex flex-col items-center justify-between"><h3>${GANGS[id].name}</h3><p class="text-xs my-2">${GANGS[id].desc}</p><button data-gang-id="${id}" class="btn-action p-2 rounded-md mt-auto">Join</button></div>`).join('')}</div></div>`;
+            if (type === 'raid') content = `<div class="modal-content p-8 rounded-lg text-center max-w-sm mx-auto raid-alert"><i class="fas fa-bullhorn text-6xl text-dark-red mb-4"></i><h2 class="text-3xl font-bold mb-2">POLICE RAID!</h2><p class="text-gray-300 mb-4">The cops are cracking down on ${data.zone}!</p></div>`;
+            if (type === 'characterCreation') {
+                content = `
+                <div class="modal-content p-8 rounded-lg text-center max-w-lg mx-auto">
+                    <h2 class="text-3xl text-gold mb-4">Establish Your Identity</h2>
+                    <div class="text-left space-y-4">
+                        <div>
+                            <label for="alias-input" class="text-gold">Enter Alias:</label>
+                            <input type="text" id="alias-input" class="w-full bg-gray-800 text-white border border-[var(--border-color)] p-2 rounded mt-1" placeholder="e.g., 'The Ghost'">
+                        </div>
+                        <div>
+                            <label class="text-gold mt-4 block">Select Background:</label>
+                            <div id="bg-selection" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                <button class="btn-action p-2" data-bg="street_rat">Street Rat<span class="block text-xs text-muted">(+5 Stealth)</span></button>
+                                <button class="btn-action p-2" data-bg="ex_military">Ex-Military<span class="block text-xs text-muted">(+20 Health, +5 Intimidation)</span></button>
+                                <button class="btn-action p-2" data-bg="broker">Runaway Broker<span class="block text-xs text-muted">(+$2k Clean Cash)</span></button>
+                            </div>
+                        </div>
+                        <div class="flex items-center mt-4">
+                            <input type="checkbox" id="hardcore-mode" class="w-4 h-4 text-red-600 bg-gray-700 border-gray-600 rounded">
+                            <label for="hardcore-mode" class="ml-2 text-sm font-medium text-red-500">Enable Hardcore Mode (Permadeath)</label>
+                        </div>
+                        <button id="confirm-char-btn" class="btn-action w-full p-2 mt-6">Finalize Dossier</button>
+                    </div>
+                </div>`;
+            }
+            if (type === 'permadeath') {
+                 content = `<div class="modal-content p-8 rounded-lg text-center max-w-lg mx-auto"><h2 class="text-5xl text-dark-red font-bold">YOU DIED</h2><div class="mt-4 border-t border-gray-700 pt-4 text-left space-y-1"><p><strong>Alias:</strong> ${data.alias}</p><p><strong>Final Level:</strong> ${data.level}</p><p><strong>Peak Respect:</strong> ${data.respect}</p><p><strong>Gang:</strong> ${data.gang ? GANGS[data.gang].name : 'Lone Wolf'}</p></div><button id="new-game-btn" class="btn-action w-full p-2 mt-6">Start a New Life</button></div>`;
+            }
+
+            UIElements.modalContainer.innerHTML = `<div class="fixed inset-0 flex items-center justify-center modal-backdrop z-50 pointer-events-auto">${content}</div>`;
+            
+            UIElements.modalContainer.querySelector('#bail-button')?.addEventListener('click', bailFromJail);
+            UIElements.modalContainer.querySelectorAll('[data-gang-id]').forEach(btn => btn.addEventListener('click', e => joinGang(e.currentTarget.dataset.gangId)));
+            if (type === 'characterCreation') {
+                let selectedBg = null;
+                const bgContainer = UIElements.modalContainer.querySelector('#bg-selection');
+                bgContainer.addEventListener('click', e => {
+                    const button = e.target.closest('[data-bg]');
+                    if (button) {
+                        bgContainer.querySelectorAll('[data-bg]').forEach(b => b.classList.remove('active', 'border-gold'));
+                        button.classList.add('active', 'border-gold');
+                        selectedBg = button.dataset.bg;
+                    }
+                });
+                document.getElementById('confirm-char-btn').addEventListener('click', () => {
+                    const alias = document.getElementById('alias-input').value;
+                    if (alias && selectedBg) {
+                        gameState.alias = alias;
+                        gameState.hardcore = document.getElementById('hardcore-mode').checked;
+                        applyCharacterBackground(selectedBg);
+                        closeModal();
+                        saveGameState();
+                        updateAllUI();
+                    } else {
+                        logMessage('Please enter an alias and select a background.', 'fail');
+                    }
+                });
+            }
+            if (type === 'permadeath') {
+                document.getElementById('new-game-btn').addEventListener('click', () => {
+                    initializeGameState();
+                    saveGameState();
+                    window.location.reload();
+                });
+            }
+            if(type === 'levelup' || type === 'raid') setTimeout(closeModal, 4000);
+        }
+        function closeModal() { UIElements.modalContainer.innerHTML = ''; }
+
+        function formatGameTime(date) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            return date.toLocaleDateString("en-US", options);
+        }
+
+        // --- GAME LOOP ---
+        let lastSaveTime = 0, lastFrameTime = 0, lastUIUpdateTime = 0;
+        function gameLoop(currentTime) {
+            if (!gameState.alias) { requestAnimationFrame(gameLoop); return; }
+            if (!lastFrameTime) lastFrameTime = currentTime;
+            const deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+
+            handleGlobalEvents(deltaTime);
+            handleTimers(deltaTime);
+            regenerateStats(deltaTime);
+            
+            if (currentTime - lastUIUpdateTime > 500) { updateAllUI(); lastUIUpdateTime = currentTime; }
+            if (currentTime - lastSaveTime > 5000) { saveGameState(); lastSaveTime = currentTime; }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- INITIALIZATION ---
+        function startGame() {
+            document.getElementById('main-menu').classList.add('fade-out');
+            document.getElementById('game-container').style.display = 'flex';
+            
+            initializeUIElements();
+            initializeGameState();
+            addEventListeners();
+            initializeAuth();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = () => {
+            document.getElementById('play-button').addEventListener('click', () => {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                startGame();
+            }, { once: true });
+        };
+    </script>
+</body>
+</html>
