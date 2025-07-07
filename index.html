@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>North Bergen v0.8</title>
+    <title>North Bergen v1.0</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,7 +55,27 @@
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
         .heist-step.completed { text-decoration: line-through; color: var(--text-muted); }
         .heist-step.active { color: var(--gold-accent); }
-        #main-menu { background: linear-gradient(to bottom, #000000, #1c1c1c); }
+        #main-menu {
+            background: url('https://images.unsplash.com/photo-1519734013744-3b3c34ac81a7?q=80&w=2070&auto=format&fit=crop') center center/cover no-repeat;
+            position: fixed; inset: 0; z-index: 100;
+        }
+        #main-menu::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(18,18,18,0.4) 0%, rgba(18,18,18,1) 100%);
+        }
+        .menu-title { animation: fadeInGlow 3s ease-in-out; }
+        .menu-options > * { opacity: 0; animation: fadeInSlideUp 0.5s ease-out forwards; }
+        @keyframes fadeInGlow {
+            0% { opacity: 0; text-shadow: 0 0 0px var(--gold-accent); }
+            50% { opacity: 1; text-shadow: 0 0 10px var(--gold-accent); }
+            100% { opacity: 1; text-shadow: 0 0 5px var(--gold-accent); }
+        }
+        @keyframes fadeInSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .particle { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); animation: float 20s infinite linear; }
         @keyframes float { 0% { transform: translateY(100vh) scale(0); } 100% { transform: translateY(-10vh) scale(1); opacity: 0; } }
     </style>
@@ -63,14 +83,14 @@
 <body class="bg-black text-white">
 
     <div id="main-menu" class="fixed inset-0 flex flex-col items-center justify-center z-50 transition-opacity duration-500 overflow-hidden">
-        <div id="particle-container" class="absolute inset-0"></div>
+        <canvas id="particle-canvas" class="absolute inset-0 w-full h-full"></canvas>
         <div class="text-center z-10">
-            <h1 class="text-6xl font-bold text-gold font-['Cinzel']">North Bergen</h1>
-            <p class="text-gray-400 mt-2 italic">The city always wins.</p>
-            <div class="mt-8 space-y-4 flex flex-col items-center">
-                <button id="play-button" class="btn-action px-8 py-4 text-2xl w-64">Enter the Streets</button>
-                <button id="new-game-button" class="btn-action px-8 py-2 text-lg w-64">New Game</button>
-                <button id="legacy-button" class="btn-action px-8 py-2 text-lg w-64">Legacy</button>
+            <h1 class="text-6xl font-bold text-gold font-['Cinzel'] menu-title">North Bergen</h1>
+            <p class="text-gray-400 mt-2 italic menu-title" style="animation-delay: 0.2s;">The city always wins.</p>
+            <div class="mt-8 space-y-4 flex flex-col items-center menu-options">
+                <button id="play-button" class="btn-action px-8 py-4 text-2xl w-64" style="animation-delay: 0.5s;">Enter the Streets</button>
+                <button id="new-game-button" class="btn-action px-8 py-2 text-lg w-64" style="animation-delay: 0.6s;">New Game</button>
+                <button id="legacy-button" class="btn-action px-8 py-2 text-lg w-64" style="animation-delay: 0.7s;">Legacy</button>
             </div>
         </div>
     </div>
@@ -231,8 +251,8 @@
         let isTyping = false;
 
         // --- INITIALIZATION ---
-        function initializeGameState() {
-            gameState = {
+        function initializeGameState(isNewGame = false) {
+            const defaultState = {
                 alias: null, background: null,
                 dirtyCash: 0, cleanCash: 500, respect: 0, energy: 100, health: 100, wanted: 0,
                 isJailed: false, jailTime: 0,
@@ -249,6 +269,18 @@
                 activeHeists: {},
                 hardcore: false,
             };
+            
+            if (isNewGame) {
+                gameState = defaultState;
+                saveGameState(true);
+                return;
+            }
+
+            const savedState = JSON.parse(localStorage.getItem('northBergenSave')) || {};
+            gameState = { ...defaultState, ...savedState };
+            
+            const offlineTime = Date.now() - (gameState.lastRealTimeCheck || Date.now());
+            processTimePassing(offlineTime, true);
         }
         
         function initializeUIElements() {
@@ -271,7 +303,9 @@
             if (!gameState.alias) return;
             updateStatsUI(); 
             const activeTab = UIElements.tabsContainer.querySelector('.active')?.dataset.tab;
-            if (activeTab) renderTabContent(activeTab);
+            if (activeTab && !isTyping) {
+                 renderTabContent(activeTab);
+            }
             renderNews();
             renderGear();
         }
@@ -304,6 +338,7 @@
         }
 
         function updateStatsUI() {
+            if (!UIElements.playerAlias) return;
             UIElements.playerAlias.textContent = gameState.alias;
             UIElements.gameTimeDisplay.textContent = formatGameTime(new Date(gameState.gameTime));
             const rank = getCurrentRank();
@@ -419,7 +454,14 @@
         }
         function renderBusinesses() {
             const container = document.getElementById('businesses-tab');
-            if (isTyping) return; // Don't re-render if user is typing
+            if (isTyping) {
+                container.querySelectorAll('[data-biz-id]').forEach(button => {
+                    const biz = BUSINESSES[button.dataset.bizId];
+                    const isOwned = gameState.ownedBusinesses.includes(button.dataset.bizId);
+                    button.disabled = isOwned || gameState.cleanCash < biz.price;
+                });
+                return;
+            };
             container.innerHTML = `
                 <div class="text-center mb-4">
                     <h2 class="text-2xl text-gold">Front Businesses</h2>
@@ -985,6 +1027,9 @@
             if (type === 'permadeath') {
                  content = `<div class="modal-content p-8 rounded-lg text-center max-w-lg mx-auto"><h2 class="text-5xl text-dark-red font-bold">YOU DIED</h2><div class="mt-4 border-t border-gray-700 pt-4 text-left space-y-1"><p><strong>Alias:</strong> ${data.alias}</p><p><strong>Final Level:</strong> ${data.level}</p><p><strong>Peak Respect:</strong> ${data.respect}</p><p><strong>Gang:</strong> ${data.gang ? GANGS[data.gang].name : 'Lone Wolf'}</p></div><button id="new-game-btn" class="btn-action w-full p-2 mt-6">Start a New Life</button></div>`;
             }
+            if (type === 'custom') {
+                content = `<div class="modal-content p-8 rounded-lg max-w-lg mx-auto text-center">${data.content}</div>`;
+            }
 
             UIElements.modalContainer.innerHTML = `<div class="fixed inset-0 flex items-center justify-center modal-backdrop z-50 pointer-events-auto">${content}</div>`;
             
@@ -1017,12 +1062,12 @@
             }
             if (type === 'permadeath') {
                 document.getElementById('new-game-btn').addEventListener('click', () => {
-                    initializeGameState();
-                    saveGameState();
+                    initializeGameState(true);
                     window.location.reload();
                 });
             }
             if(type === 'levelup' || type === 'raid') setTimeout(closeModal, 4000);
+            if(data.onRender) data.onRender(UIElements.modalContainer.querySelector('.modal-content'));
         }
         function closeModal() { UIElements.modalContainer.innerHTML = ''; }
 
@@ -1049,24 +1094,67 @@
         }
 
         // --- INITIALIZATION ---
-        function startGame() {
+        function startGame(isNew) {
             document.getElementById('main-menu').classList.add('fade-out');
             document.getElementById('game-container').style.display = 'flex';
             
             initializeUIElements();
-            initializeGameState();
+            initializeGameState(isNew);
             addEventListeners();
             initializeAuth();
             requestAnimationFrame(gameLoop);
         }
 
         window.onload = () => {
-            document.getElementById('play-button').addEventListener('click', () => {
-                if (Tone.context.state !== 'running') {
-                    Tone.start();
+            const particleContainer = document.getElementById('particle-container');
+            if (particleContainer) {
+                for(let i = 0; i < 50; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = `${Math.random() * 100}%`;
+                    particle.style.animationDuration = `${Math.random() * 10 + 10}s`;
+                    particle.style.animationDelay = `${Math.random() * 20}s`;
+                    particle.style.width = `${Math.random() * 3}px`;
+                    particle.style.height = particle.style.width;
+                    particleContainer.appendChild(particle);
                 }
-                startGame();
-            }, { once: true });
+            }
+
+            document.getElementById('play-button').addEventListener('click', () => {
+                if (Tone.context.state !== 'running') Tone.start();
+                startGame(false);
+            });
+            
+            document.getElementById('new-game-button').addEventListener('click', () => {
+                showModal('custom', { 
+                    content: `<h2 class="text-3xl text-gold mb-4">Start a New Life?</h2><p class="mb-6">Your current progress will be erased permanently. Are you sure?</p><div class="flex justify-center gap-4"><button id="confirm-new-game" class="btn-action bg-red-800 hover:bg-red-700">Yes, Erase It</button><button id="cancel-new-game" class="btn-action">No, Go Back</button></div>`, 
+                    onRender: (modal) => {
+                        modal.querySelector('#confirm-new-game').addEventListener('click', () => {
+                             if (Tone.context.state !== 'running') Tone.start();
+                             localStorage.removeItem('northBergenSave');
+                             window.location.reload();
+                        });
+                        modal.querySelector('#cancel-new-game').addEventListener('click', closeModal);
+                    }
+                });
+            });
+
+            document.getElementById('legacy-button').addEventListener('click', () => {
+                const legacies = JSON.parse(localStorage.getItem('north_bergen_legacies') || '[]');
+                let legacyContent = '<h2 class="text-3xl text-gold mb-4">Hall of the Fallen</h2>';
+                if (legacies.length === 0) {
+                    legacyContent += '<p class="text-muted">No legacies recorded. Go out there and make a name for yourself.</p>';
+                } else {
+                    legacyContent += `<div class="space-y-2 text-left">${legacies.map(l => `<div class="border-b border-gray-700 pb-2 mb-2"><p><strong>${l.alias}</strong> - Level ${l.level} ${l.gang ? GANGS[l.gang].name : 'Lone Wolf'}</p><p class="text-sm text-muted">Fell on ${new Date(l.date).toLocaleDateString()}</p></div>`).join('')}</div>`;
+                }
+                legacyContent += `<button id="close-legacy-btn" class="btn-action w-full p-2 mt-6">Close</button>`;
+                showModal('custom', { 
+                    content: legacyContent,
+                    onRender: (modal) => {
+                        modal.querySelector('#close-legacy-btn').addEventListener('click', closeModal);
+                    }
+                });
+            });
         };
     </script>
 </body>
